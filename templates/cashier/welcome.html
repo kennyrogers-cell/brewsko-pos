@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Cashier Station - Brewsko Bistro{% endblock %}
+{% block body %}
+<div class="min-h-screen bg-brown-950 px-4 py-10">
+  <div class="mx-auto max-w-3xl min-h-[520px] rounded-[32px] border border-brewsko-500 bg-brown-900/95 p-10 shadow-2xl shadow-black/40 transition hover:-translate-y-0.5" onclick="window.location.href='{% url 'cashier:order' %}'" style="cursor:pointer;">
+    <div class="flex h-full flex-col justify-between gap-8">
+      <div class="rounded-3xl bg-brown-800/90 p-5">
+        <span class="text-sm uppercase tracking-[0.3em] text-warmgray-400">Cashier Station</span>
+      </div>
+      <div class="text-center space-y-6">
+        <h1 class="text-4xl font-semibold text-warmgray-50">Welcome back to Cashier Station</h1>
+        <img src="{% static 'img/logo.png' %}" alt="Brewsko" class="mx-auto h-32 w-32 rounded-full border border-brewsko-500 bg-brown-950 object-cover" onerror="this.style.display='none'">
+        <p class="text-sm uppercase tracking-[0.3em] text-warmgray-400">Tap anywhere to start a new order</p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

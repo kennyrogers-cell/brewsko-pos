@@ -1,0 +1,752 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Order - Cashier Station{% endblock %}
+
+{% block extra_head %}
+<style>
+.active { background-color: #DC5F2D; border-color: #DC5F2D; color: #2C1203 !important; }
+.selected { background-color: #DC5F2D; border-color: #DC5F2D; color: #2C1203 !important; }
+.main-tabs .main-tab {
+  background-color: #2C1203;
+  color: #B89670;
+  border: 1px solid #7A4020;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.03);
+}
+.main-tabs .main-tab:hover {
+  background-color: #3D1A08;
+}
+.main-tabs .main-tab.active {
+  background-color: #4A2010 !important;
+  color: #F5E6D0 !important;
+  border-color: #DC5F2D;
+  box-shadow: 0 0 0 1px rgba(220,95,45,0.35);
+}
+.cashier-body { align-items: flex-start; }
+.menu-panel { display: flex; flex-direction: column; max-height: calc(100vh - 10rem); }
+.menu-content-row { flex: 1; display: flex; min-height: 0; overflow: hidden; }
+.cat-sidebar { overflow-y: auto; max-height: calc(100vh - 17rem); min-height: 0; }
+.items-area { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+#itemsGrid { flex: 1; min-height: 0; overflow-y: auto; }
+.order-panel { max-height: min(660px, calc(100vh - 8rem)); overflow: hidden; display: flex; flex-direction: column; }
+.order-items { max-height: 220px; overflow-y: auto; }
+.cart-item.selected { border-color: #DC5F2D; background-color: rgba(220,95,45,0.12); }
+.cart-item-check { min-width: 28px; min-height: 28px; }
+.order-status-panel { position: sticky; top: 1rem; border: 1px solid rgba(209, 146, 82, 0.22); background-color: rgba(39, 26, 13, 0.98); z-index: 1; max-height: 380px; overflow: hidden; }
+.status-card { min-height: 78px; }
+.status-filter-card { cursor: pointer; border-color: rgba(114, 84, 54, 0.6); background-color: rgba(28, 17, 9, 0.92); transition: transform 0.15s, border-color 0.15s, background-color 0.15s; padding: 0.85rem 0.8rem; }
+.status-filter-card:hover { transform: translateY(-1px); border-color: rgba(255, 185, 84, 0.55); }
+.status-filter-card.active { border-color: #FFB571; background-color: rgba(255, 131, 37, 0.16); }
+.order-status-list { max-height: 200px; overflow-y: auto; }
+.order-status-item { border: 1px solid rgba(114, 84, 54, 0.6); background-color: rgba(28, 17, 9, 0.92); padding: 1rem; }
+.status-chip { display: inline-flex; align-items: center; justify-content: center; border-radius: 9999px; padding: 0.35rem 0.9rem; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; }
+.status-chip-pending { background-color: rgba(255, 185, 84, 0.14); color: #FFC68C; }
+.status-chip-preparing { background-color: rgba(255, 131, 37, 0.16); color: #FFB571; }
+.status-chip-ready { background-color: rgba(70, 224, 132, 0.14); color: #A0F0B0; }
+</style>
+{% endblock %}
+
+{% block body %}
+<div class="cashier-layout min-h-screen bg-brown-950 text-warmgray-50">
+
+  <!-- TOP BAR -->
+  <div class="cashier-topbar flex flex-col gap-4 border-b border-brown-700 bg-brown-900/95 px-4 py-4 backdrop-blur-sm md:flex-row md:items-center md:justify-between">
+    <div class="cashier-brand flex items-center gap-3 text-xl font-semibold tracking-wide text-warmgray-50">
+      <img src="{% static 'img/logo.png' %}" alt="" class="h-16 w-16 rounded-3xl border border-brown-600 bg-brown-800 object-cover" onerror="this.style.display='none'">
+      <span>Cashier Station</span>
+    </div>
+    <button type="button" onclick="openLogoutConfirm()" class="logout-btn-top inline-flex items-center justify-center rounded-2xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-600">⇥ Logout</button>
+  </div>
+
+  <div class="cashier-body flex flex-col gap-5 p-4 lg:flex-row lg:items-start lg:justify-between">
+
+    <!-- ── LEFT: MENU ── -->
+    <div class="menu-panel flex-1 overflow-hidden rounded-[32px] border border-brown-700 bg-brown-900 shadow-2xl">
+
+      <!-- Foods / Drinks -->
+      <div class="main-tabs flex items-center gap-3 border-b border-brown-700 px-5 py-4">
+        <button class="main-tab active flex-1 rounded-2xl border border-brown-600 bg-brown-800 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:bg-brown-700" id="tabFoods" onclick="switchTab('food')">Foods</button>
+        <button class="main-tab flex-1 rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-300 transition hover:bg-brown-800" id="tabDrinks" onclick="switchTab('drink')">Drinks</button>
+      </div>
+
+      <!-- Search -->
+      <div class="menu-search px-5 py-4">
+        <input type="text" id="menuSearch" placeholder="Search menu items..." oninput="filterMenu(this.value)" class="w-full rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm text-warmgray-50 outline-none transition focus:border-orange-500" />
+      </div>
+
+      <div class="menu-content-row flex flex-col gap-4 px-5 pb-5 md:flex-row">
+        <!-- Category sidebar -->
+        <div id="catSidebar" class="cat-sidebar w-full shrink-0 rounded-3xl border border-brown-700 bg-brown-950 p-3 md:w-36" style="max-height: calc(100vh - 17.5rem); overflow-y: auto;">
+        </div>
+
+        <!-- Items -->
+        <div class="items-area flex-1 flex-col gap-4 overflow-hidden">
+          <div id="itemsGrid" class="items-grid grid min-h-[320px] h-full max-h-[calc(100vh-24rem)] grid-cols-1 gap-4 overflow-y-auto sm:grid-cols-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT: ORDER PANEL ── -->
+    <div class="order-panel w-full max-w-[360px] shrink-0 rounded-[32px] border border-brown-700 bg-brown-900 shadow-2xl">
+      <div class="order-status-panel mb-5 rounded-[28px] px-6 py-5">
+        <div class="flex items-center justify-between gap-3 pb-4">
+          <div>
+            <h3 class="text-base font-semibold text-warmgray-50">Kitchen Flow</h3>
+          </div>
+          <span id="statusLabel" class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Showing pending</span>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div id="filterPending" class="status-filter-card rounded-3xl border px-3 py-3 text-center" onclick="setOrderStatusFilter('pending')">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-warmgray-400">Pending</div>
+            <div id="statusPendingCount" class="mt-2 text-xl font-semibold text-brewsko-300">0</div>
+          </div>
+          <div id="filterPreparing" class="status-filter-card rounded-3xl border px-3 py-3 text-center" onclick="setOrderStatusFilter('preparing')">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-warmgray-400">Preparing</div>
+            <div id="statusPreparingCount" class="mt-2 text-xl font-semibold text-warmgray-50">0</div>
+          </div>
+          <div id="filterReady" class="status-filter-card rounded-3xl border px-3 py-3 text-center" onclick="setOrderStatusFilter('ready')">
+            <div class="text-[10px] uppercase tracking-[0.35em] text-warmgray-400">Ready</div>
+            <div id="statusReadyCount" class="mt-2 text-xl font-semibold text-brewsko-300">0</div>
+          </div>
+        </div>
+        <div id="orderStatusList" class="order-status-list space-y-3 mt-4">
+          <div class="rounded-3xl border border-dashed border-brown-700/50 bg-brown-950/80 p-4 text-center text-sm text-warmgray-400">No active orders yet.</div>
+        </div>
+      </div>
+      <div class="order-title-bar px-6 py-5 text-lg font-semibold tracking-wide text-warmgray-50">Current Order</div>
+      <div class="order-type-row flex gap-3 px-5 pb-5">
+        <button class="type-btn active flex-1 rounded-2xl bg-brown-800 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:bg-brown-700" id="btnDineIn" onclick="setType('dine-in')">Dine-In</button>
+        <button class="type-btn flex-1 rounded-2xl bg-brown-800 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:bg-brown-700" id="btnToGo" onclick="setType('to-go')">To-go</button>
+      </div>
+      <div class="order-items min-h-[260px] overflow-y-auto px-5 pb-5" id="orderItems">
+        <p class="empty-cart py-16 text-center text-sm text-warmgray-400">No items yet</p>
+      </div>
+      <div class="order-footer border-t border-brown-700 px-6 py-5">
+        <div class="subtotal-row flex justify-between text-sm text-warmgray-300"><span>Subtotal</span><span id="subtotalAmt">₱ 0.00</span></div>
+        <div class="total-row mt-3 flex justify-between text-base font-semibold text-warmgray-50"><span>Total</span><span id="totalAmt">₱ 0.00</span></div>
+        <div class="footer-btns mt-5">
+          <div class="btn-row flex gap-3">
+            <button id="clearBtn" class="w-1/2 rounded-2xl border border-brown-600 bg-brown-800 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-rose-400 disabled:opacity-50" onclick="clearCart()">Clear</button>
+            <button id="proceedBtn" class="w-1/2 rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600 disabled:opacity-50" onclick="openPayment()">Proceed</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── CUSTOMIZE MODAL ── -->
+<div id="customizeModal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center bg-brown-950/80 backdrop-blur-sm" onclick="if(event.target===this)closeM('customizeModal')">
+  <div class="customize-box w-full max-w-lg rounded-[28px] border border-brown-600 bg-brown-900 p-8 shadow-2xl">
+    <div class="customize-title mb-6 text-xl font-semibold text-warmgray-50" id="custTitle">Customize</div>
+
+    <div id="secServing" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Serving Style</div>
+      <div class="option-btns flex flex-wrap gap-3">
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'serving')" data-v="Rice Meal">Rice Meal</button>
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'serving')" data-v="Ala Corte">Ala Corte</button>
+      </div>
+    </div>
+
+    <div id="secSize" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Size</div>
+      <div class="option-btns flex flex-wrap gap-3">
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'size')" data-v="12oz">12oz</button>
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'size')" data-v="16oz">16oz</button>
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'size')" data-v="22oz">22oz</button>
+      </div>
+    </div>
+
+    <div id="secTemp" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Temperature</div>
+      <div class="option-btns flex flex-wrap gap-3">
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'temp')" data-v="Hot">Hot</button>
+        <button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="pick(this,'temp')" data-v="Iced">Iced</button>
+      </div>
+    </div>
+
+    <div id="secAddons" class="c-section mb-6">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Add-ons (Optional)</div>
+      <div class="option-btns flex flex-wrap gap-3" id="addonBtns"></div>
+    </div>
+
+    <div class="modal-actions mt-4 flex flex-wrap gap-3 justify-end">
+      <button class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeM('customizeModal')">Cancel</button>
+      <button class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="addToCart()">Add to Order</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EDIT ITEM MODAL ── -->
+<div id="editItemModal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center bg-brown-950/80 backdrop-blur-sm" onclick="if(event.target===this)closeM('editItemModal')">
+  <div class="edit-box w-full max-w-lg rounded-[28px] border border-brown-600 bg-brown-900 p-8 shadow-2xl">
+    <div class="edit-title mb-6 text-xl font-semibold text-warmgray-50" id="editCustTitle">Customize Item</div>
+
+    <div id="editSecServing" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Serving Style</div>
+      <div class="option-btns flex flex-wrap gap-3" id="editServingBtns"></div>
+    </div>
+
+    <div id="editSecSize" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Size</div>
+      <div class="option-btns flex flex-wrap gap-3" id="editSizeBtns"></div>
+    </div>
+
+    <div id="editSecTemp" class="c-section mb-6 hidden">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Temperature</div>
+      <div class="option-btns flex flex-wrap gap-3" id="editTempBtns"></div>
+    </div>
+
+    <div id="editSecAddons" class="c-section mb-6">
+      <div class="c-label mb-3 text-sm font-semibold uppercase tracking-[0.16em] text-warmgray-300">Add-ons (Optional)</div>
+      <div class="option-btns flex flex-wrap gap-3" id="editAddonBtns"></div>
+    </div>
+
+    <div class="modal-actions mt-4 flex flex-wrap gap-3 justify-end">
+      <button class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeM('editItemModal')">Cancel</button>
+      <button class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="saveEditItem()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── PAYMENT MODAL ── -->
+<div id="paymentModal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center bg-brown-950/80 backdrop-blur-sm" onclick="if(event.target===this)closeM('paymentModal')">
+  <div class="payment-box w-full max-w-xl rounded-[28px] border border-brown-600 bg-brown-900 p-8 shadow-2xl">
+    <div class="payment-title mb-6 text-xl font-semibold text-warmgray-50">Payment</div>
+    <div class="text-sm text-warmgray-300 mb-4">Payment Method</div>
+    <div class="pay-methods grid gap-3 sm:grid-cols-2">
+      <button class="pay-btn active rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" id="btnCash" onclick="setPayM('cash')">Cash</button>
+      <button class="pay-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" id="btnGcash" onclick="setPayM('gcash')">GCash</button>
+    </div>
+    <div class="pay-info mt-6 rounded-3xl border border-brown-700 bg-brown-950 p-5 text-sm text-warmgray-300">
+      <div class="pay-row flex justify-between pb-3"><span>Total Amount</span><span class="pay-total-val text-orange-400 font-semibold" id="payTotal">₱0</span></div>
+      <div class="pay-row flex justify-between"><span>Order Type:</span><span id="payType">Dine-In</span></div>
+    </div>
+    <div id="cashArea" class="mt-6">
+      <div class="text-sm text-warmgray-300 mb-2">Amount Received</div>
+      <input type="number" id="amtReceived" class="pay-input w-full rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm text-warmgray-50 outline-none transition focus:border-orange-500" placeholder="0" oninput="calcChange()">
+      <div class="change-txt mt-3 text-sm text-warmgray-300" id="changeTxt"></div>
+    </div>
+    <div id="gcashArea" class="mt-6 hidden">
+      <div class="text-sm text-warmgray-300 mb-2">Reference Number</div>
+      <input type="text" id="refNum" class="pay-input w-full rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm text-warmgray-50 outline-none transition focus:border-orange-500" placeholder="Enter reference number">
+    </div>
+    <div class="modal-actions mt-6 flex flex-wrap gap-3 justify-end">
+      <button class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeM('paymentModal')">Cancel</button>
+      <button class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="confirmPay()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ERROR MODAL ── -->
+<div id="errorModal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center bg-brown-950/80 backdrop-blur-sm" onclick="if(event.target===this)closeM('errorModal')">
+  <div class="result-box w-full max-w-md rounded-[28px] border border-rose-500 bg-brown-900 p-8 text-center shadow-2xl">
+    <div class="err-x text-5xl text-rose-400">✕</div>
+    <div class="err-title mt-4 text-xl font-semibold text-rose-400">Payment Error</div>
+    <div class="err-msg mt-4 text-base font-semibold text-warmgray-50">Transaction Failed</div>
+    <div class="err-sub mt-2 text-sm text-warmgray-300">Payment amount is insufficient</div>
+    <div class="modal-actions mt-8 flex flex-wrap justify-center gap-3">
+      <button class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeM('errorModal')">Go back</button>
+      <button class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="closeM('errorModal');openPayment()">Retry</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── RECEIPT MODAL ── -->
+<div id="receiptModal" class="modal-overlay fixed inset-0 z-50 hidden items-center justify-center bg-brown-950/80 backdrop-blur-sm">
+  <div class="receipt-box w-full max-w-md rounded-[28px] border border-brown-600 bg-brown-900 p-8 text-center shadow-2xl" id="receiptBox"></div>
+</div>
+
+<script>
+// Data
+const FOOD_CATS  = {{ food_categories|safe }};
+const DRINK_CATS = {{ drink_categories|safe }};
+const FOOD_NAMES  = {{ food_cat_names|safe }};
+const DRINK_NAMES = {{ drink_cat_names|safe }};
+const FOOD_TOPPING_CATS = ['Burger With Fries','Pizza','Pasta','Appetizer'];
+const FOOD_ADDONS_TOPPINGS = ['Extra Toppings','Extra Sauce'];
+const FOOD_ADDONS_UNLI = ['Unli Rice','Extra Sauce'];
+const D_ADDONS = ['Extra Shot','Extra Syrup','Whipped Cream'];
+
+function getFoodAddons(category) {
+  return FOOD_TOPPING_CATS.includes(category) ? FOOD_ADDONS_TOPPINGS : FOOD_ADDONS_UNLI;
+}
+
+function normalizeAddon(addon, category) {
+  if (addon !== 'Extra Rice') return addon;
+  return FOOD_TOPPING_CATS.includes(category) ? 'Extra Toppings' : 'Unli Rice';
+}
+
+// State
+let tab = 'food', cat = '';
+let orderType = 'dine-in', payMethod = 'cash';
+let cart = [], pendItem = null, pCustom = {}, addons = new Set();
+let pendingHasServ = false, pendingHasSize = false, pendingHasTemp = false;
+let editIndex = null, editCustom = {}, editAddons = new Set();
+let cartHistory = [];
+let historyIndex = -1;
+let orderStatusFilter = 'pending';
+let statusNotifications = [];
+
+function cloneCart(cartState) {
+  return JSON.parse(JSON.stringify(cartState));
+}
+
+function saveHistory() {
+  const snapshot = cloneCart(cart);
+  if (historyIndex < cartHistory.length - 1) {
+    cartHistory = cartHistory.slice(0, historyIndex + 1);
+  }
+  cartHistory.push(snapshot);
+  historyIndex = cartHistory.length - 1;
+  updateHistoryButtons();
+}
+
+function updateHistoryButtons() {
+  const u = document.getElementById('undoBtn');
+  const r = document.getElementById('redoBtn');
+  if (u) u.disabled = historyIndex <= 0;
+  if (r) r.disabled = historyIndex >= cartHistory.length - 1;
+}
+
+function undoAction() {
+  if (historyIndex <= 0) return;
+  historyIndex -= 1;
+  cart = cloneCart(cartHistory[historyIndex]);
+  renderCart();
+  updateHistoryButtons();
+}
+
+function redoAction() {
+  if (historyIndex >= cartHistory.length - 1) return;
+  historyIndex += 1;
+  cart = cloneCart(cartHistory[historyIndex]);
+  renderCart();
+  updateHistoryButtons();
+}
+
+// Init
+renderCats(); renderCart();
+saveHistory();
+fetchOrderStatuses();
+setInterval(fetchOrderStatuses, 5000);
+
+// ── TABS ──
+function switchTab(t) {
+  tab = t;
+  const foods = document.getElementById('tabFoods');
+  const drinks = document.getElementById('tabDrinks');
+  if (t === 'food') {
+    foods.classList.add('active', 'bg-brown-800', 'text-warmgray-50');
+    foods.classList.remove('bg-brown-950', 'text-warmgray-300');
+    drinks.classList.remove('active', 'bg-brown-800', 'text-warmgray-50');
+    drinks.classList.add('bg-brown-950', 'text-warmgray-300');
+  } else {
+    drinks.classList.add('active', 'bg-brown-800', 'text-warmgray-50');
+    drinks.classList.remove('bg-brown-950', 'text-warmgray-300');
+    foods.classList.remove('active', 'bg-brown-800', 'text-warmgray-50');
+    foods.classList.add('bg-brown-950', 'text-warmgray-300');
+  }
+  document.getElementById('menuSearch').value = '';
+  renderCats();
+}
+
+function renderCats() {
+  const names = tab==='food' ? FOOD_NAMES : DRINK_NAMES;
+  const sb = document.getElementById('catSidebar');
+  sb.innerHTML = names.map((n,i) =>
+    `<button class="cat-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 text-left transition hover:bg-brown-800${i===0?' active':''}" onclick="selCat('${n}',this)">${n}</button>`
+  ).join('');
+  if (names.length) selCat(names[0], sb.querySelector('.cat-btn'));
+}
+
+function selCat(c, btn) {
+  cat = c;
+  document.querySelectorAll('.cat-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  renderItems();
+}
+
+function renderItems(q) {
+  const data = tab==='food' ? FOOD_CATS : DRINK_CATS;
+  let items = data[cat] || [];
+  if (q) items = items.filter(i=>i.name.toLowerCase().includes(q));
+  const g = document.getElementById('itemsGrid');
+  if (!items.length) { g.innerHTML='<p class="col-span-full p-6 text-center text-sm text-warmgray-400">No items.</p>'; return; }
+  g.innerHTML = items.map(item =>
+    `<div class="menu-item-card cursor-pointer rounded-3xl border border-brown-600 bg-brown-950 p-4 shadow-sm transition hover:border-orange-500 hover:bg-brown-900" onclick="itemClick(${item.id},'${es(item.name)}',${item.price},'${item.category}',${item.has_serving_style},${item.has_size},${item.has_temperature})">
+      <div class="item-name text-sm font-semibold text-warmgray-50">${item.name}</div>
+      <div class="item-price mt-3 text-sm font-semibold text-orange-400">₱${item.price}</div>
+    </div>`
+  ).join('');
+}
+
+function filterMenu(q) {
+  if (!q) { renderItems(); return; }
+  const data = tab==='food' ? FOOD_CATS : DRINK_CATS;
+  const all = Object.values(data).flat().filter(i=>i.name.toLowerCase().includes(q.toLowerCase()));
+  const g = document.getElementById('itemsGrid');
+  if (!all.length) { g.innerHTML='<p class="col-span-full p-6 text-center text-sm text-warmgray-400">No items.</p>'; return; }
+  g.innerHTML = all.map(item =>
+    `<div class="menu-item-card cursor-pointer rounded-3xl border border-brown-600 bg-brown-950 p-4 shadow-sm transition hover:border-orange-500 hover:bg-brown-900" onclick="itemClick(${item.id},'${es(item.name)}',${item.price},'${item.category}',${item.has_serving_style},${item.has_size},${item.has_temperature})">
+      <div class="item-name text-sm font-semibold text-warmgray-50">${item.name}</div>
+      <div class="item-price mt-3 text-sm font-semibold text-orange-400">₱${item.price}</div>
+    </div>`
+  ).join('');
+}
+
+function es(s){ return s.replace(/'/g,"\\'"); }
+
+// ── ITEM CLICK ──
+function itemClick(id, name, price, category, hasServ, hasSize, hasTemp) {
+  pendItem = {id, name, price, category};
+  pCustom = {serving:'', size:'', temp:'', addons:[]};
+  addons = new Set();
+  pendingHasServ = hasServ;
+  pendingHasSize = hasSize;
+  pendingHasTemp = hasTemp;
+  const isFood = FOOD_NAMES.includes(category);
+  const isDrink = DRINK_NAMES.includes(category);
+  document.getElementById('custTitle').textContent = `Customize ${name}`;
+  document.getElementById('secServing').style.display = (isFood && hasServ) ? 'block' : 'none';
+  document.getElementById('secSize').style.display = (isDrink && hasSize) ? 'block' : 'none';
+  document.getElementById('secTemp').style.display = (isDrink && hasTemp) ? 'block' : 'none';
+  // addons
+  const aa = isFood ? getFoodAddons(category) : D_ADDONS;
+  document.getElementById('addonBtns').innerHTML = aa.map(a =>
+    `<button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" data-v="${a}" onclick="togAddon(this,'${a}')">${a}</button>`
+  ).join('');
+  // reset picks
+  document.querySelectorAll('.option-btn:not([data-v])').forEach(b=>b.classList.remove('selected'));
+  document.querySelectorAll('#secServing .option-btn, #secSize .option-btn, #secTemp .option-btn').forEach(b=>b.classList.remove('selected'));
+  document.getElementById('customizeModal').style.display='flex';
+}
+
+function pick(btn, type) {
+  btn.closest('.option-btns').querySelectorAll('.option-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  pCustom[type] = btn.dataset.v;
+}
+
+function togAddon(btn, name) {
+  if(addons.has(name)){addons.delete(name);btn.classList.remove('selected');}
+  else{addons.add(name);btn.classList.add('selected');}
+}
+
+// ── ADD TO CART ──
+function addToCart() {
+  pCustom.addons = [...addons];
+  const item = {
+    id: pendItem.id, name: pendItem.name, price: pendItem.price,
+    unit_price: pendItem.price, quantity: 1, subtotal: pendItem.price,
+    serving_style: pCustom.serving, size: pCustom.size,
+    temperature: pCustom.temp, addons: pCustom.addons,
+    category: pendItem.category,
+    has_serving_style: pendingHasServ,
+    has_size: pendingHasSize,
+    has_temperature: pendingHasTemp,
+    selected: false,
+  };
+  const ex = cart.find(c =>
+    c.id===item.id && c.serving_style===item.serving_style &&
+    c.size===item.size && c.temperature===item.temperature &&
+    JSON.stringify([...c.addons].sort())===JSON.stringify([...item.addons].sort())
+  );
+  if(ex){ex.quantity++;ex.subtotal=ex.quantity*ex.unit_price;}
+  else cart.push(item);
+  closeM('customizeModal');
+  renderCart();
+  saveHistory();
+}
+
+// ── RENDER CART ──
+function renderCart() {
+  const el = document.getElementById('orderItems');
+  if(!cart.length){el.innerHTML='<p class="empty-cart">No items yet</p>';updateTotals();return;}
+  el.innerHTML = cart.map((item,i)=>{
+    const customRows = [];
+    if(item.serving_style) customRows.push(`<div class="cart-item-custom-row flex flex-wrap gap-2 text-sm text-warmgray-300"><span class="cart-custom-label font-semibold text-warmgray-400">Serving Style:</span><span>${item.serving_style}</span></div>`);
+    if(item.size) customRows.push(`<div class="cart-item-custom-row flex flex-wrap gap-2 text-sm text-warmgray-300"><span class="cart-custom-label font-semibold text-warmgray-400">Size:</span><span>${item.size}</span></div>`);
+    if(item.temperature) customRows.push(`<div class="cart-item-custom-row flex flex-wrap gap-2 text-sm text-warmgray-300"><span class="cart-custom-label font-semibold text-warmgray-400">Temperature:</span><span>${item.temperature}</span></div>`);
+    if(item.addons && item.addons.length) customRows.push(`<div class="cart-item-custom-row flex flex-wrap gap-2 text-sm text-warmgray-300"><span class="cart-custom-label font-semibold text-warmgray-400">Add-ons:</span><span>${item.addons.join(', ')}</span></div>`);
+    return `<div class="cart-item flex flex-col gap-2 rounded-3xl border border-brown-600 bg-brown-950 p-3 shadow-sm ${item.selected ? 'selected' : ''}" onclick="toggleCartSelection(${i})">
+      <div class="cart-item-header flex items-start justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <div class="cart-item-check ${item.selected ? 'flex' : 'hidden'} items-center justify-center h-7 w-7 rounded-full bg-orange-500 text-sm font-bold text-brown-950">✓</div>
+          <div class="cart-item-name text-sm font-semibold text-warmgray-50">${item.name}</div>
+        </div>
+        <button type="button" class="remove-btn rounded-full border border-transparent bg-rose-500/10 px-3 py-2 text-xs font-semibold text-rose-300 transition hover:border-rose-400 hover:bg-rose-500/15" onclick="event.stopPropagation();rmItem(${i})">✕</button>
+      </div>
+      <div class="cart-item-body flex flex-col gap-2">
+        ${customRows.length?`<div class="cart-item-customs space-y-1">${customRows.join('')}</div>`:'<div class="cart-item-customs h-4"></div>'}
+      </div>
+      <div class="cart-controls flex items-center justify-between gap-2 pt-1 text-sm">
+        <div class="qty-group flex items-center gap-2">
+          <button class="qty-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-brown-600 bg-brown-800 text-warmgray-50 transition hover:bg-orange-500" onclick="event.stopPropagation();chgQty(${i},-1)">−</button>
+          <span class="qty-num min-w-[24px] text-center text-sm font-semibold text-warmgray-50">${item.quantity}</span>
+          <button class="qty-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-brown-600 bg-brown-800 text-warmgray-50 transition hover:bg-orange-500" onclick="event.stopPropagation();chgQty(${i},1)">+</button>
+          <button class="qty-btn inline-flex h-8 w-8 items-center justify-center rounded-full border border-brown-600 bg-brown-800 text-warmgray-50 transition hover:border-brewsko-500" onclick="event.stopPropagation();openEditItem(${i})">✏</button>
+        </div>
+        <span class="item-price-tag text-sm font-semibold text-orange-400">₱${item.subtotal.toFixed(2)}</span>
+      </div>
+    </div>`;
+  }).join('');
+  updateTotals();
+}
+
+function chgQty(i,d){cart[i].quantity=Math.max(1,cart[i].quantity+d);cart[i].subtotal=cart[i].quantity*cart[i].unit_price;renderCart();saveHistory();}
+function toggleCartSelection(i){cart[i].selected = !cart[i].selected;renderCart();}
+function rmItem(i){cart.splice(i,1);renderCart();saveHistory();}
+function clearCart(){cart=[];renderCart();saveHistory();}
+function openEditItem(i){
+  editIndex = i;
+  const item = cart[i];
+  editCustom = { serving: item.serving_style || '', size: item.size || '', temp: item.temperature || '', addons: item.addons ? item.addons.map(a=>normalizeAddon(a, item.category)) : [] };
+  editAddons = new Set(editCustom.addons);
+  const isFood = FOOD_NAMES.includes(item.category);
+  const isDrink = DRINK_NAMES.includes(item.category);
+  const hasServ = item.has_serving_style ?? isFood;
+  const hasSize = item.has_size ?? isDrink;
+  const hasTemp = item.has_temperature ?? isDrink;
+  document.getElementById('editCustTitle').textContent = `Customize ${item.name}`;
+  document.getElementById('editSecServing').style.display = hasServ ? 'block' : 'none';
+  document.getElementById('editSecSize').style.display = hasSize ? 'block' : 'none';
+  document.getElementById('editSecTemp').style.display = hasTemp ? 'block' : 'none';
+  document.getElementById('editServingBtns').innerHTML = ['Rice Meal','Ala Corte'].map(a =>
+    `<button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500${editCustom.serving===a?' selected':''}" onclick="editPick(this,'serving')" data-v="${a}">${a}</button>`
+  ).join('');
+  document.getElementById('editSizeBtns').innerHTML = ['12oz','16oz','22oz'].map(a =>
+    `<button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500${editCustom.size===a?' selected':''}" onclick="editPick(this,'size')" data-v="${a}">${a}</button>`
+  ).join('');
+  document.getElementById('editTempBtns').innerHTML = ['Hot','Iced'].map(a =>
+    `<button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500${editCustom.temp===a?' selected':''}" onclick="editPick(this,'temp')" data-v="${a}">${a}</button>`
+  ).join('');
+  const addonList = isFood ? getFoodAddons(item.category) : D_ADDONS;
+  document.getElementById('editAddonBtns').innerHTML = addonList.map(a =>
+    `<button class="option-btn rounded-2xl border border-brown-600 bg-brown-950 px-4 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500${editAddons.has(a)?' selected':''}" onclick="editTogAddon(this,'${a}')" data-v="${a}">${a}</button>`
+  ).join('');
+  document.getElementById('editItemModal').style.display = 'flex';
+}
+function editPick(btn, type) {
+  document.querySelectorAll(`#editSec${type.charAt(0).toUpperCase()+type.slice(1)} .option-btn`).forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  editCustom[type] = btn.dataset.v;
+}
+function editTogAddon(btn, name) {
+  if(editAddons.has(name)) { editAddons.delete(name); btn.classList.remove('selected'); }
+  else { editAddons.add(name); btn.classList.add('selected'); }
+}
+function saveEditItem(){
+  if(editIndex === null) return;
+  const item = cart[editIndex];
+  item.serving_style = editCustom.serving || '';
+  item.size = editCustom.size || '';
+  item.temperature = editCustom.temp || '';
+  item.addons = [...editAddons];
+  renderCart();
+  saveHistory();
+  closeM('editItemModal');
+  showToast('Order item updated', 'success');
+}
+function updateTotals(){
+  const t=cart.reduce((s,i)=>s+i.subtotal,0);
+  document.getElementById('subtotalAmt').textContent=`₱ ${t.toFixed(2)}`;
+  document.getElementById('totalAmt').textContent=`₱ ${t.toFixed(2)}`;
+}
+
+// enable/disable action buttons based on cart state
+function refreshActionButtons(){
+  const empty = cart.length === 0;
+  const proceed = document.getElementById('proceedBtn');
+  const clearb = document.getElementById('clearBtn');
+  if(proceed) proceed.disabled = empty;
+  if(clearb) clearb.disabled = empty;
+  updateHistoryButtons();
+}
+
+// call refreshActionButtons whenever totals change
+const _oldUpdateTotals = updateTotals;
+updateTotals = function(){ _oldUpdateTotals(); refreshActionButtons(); };
+
+// ── ORDER TYPE ──
+function setType(t){
+  orderType=t;
+  document.getElementById('btnDineIn').classList.toggle('active',t==='dine-in');
+  document.getElementById('btnToGo').classList.toggle('active',t==='to-go');
+}
+
+// ── PAYMENT ──
+function openPayment(){
+  if(!cart.length){alert('Please add items first.');return;}
+  const total=cart.reduce((s,i)=>s+i.subtotal,0);
+  document.getElementById('payTotal').textContent=`₱${total.toFixed(2)}`;
+  document.getElementById('payType').textContent=orderType==='dine-in'?'Dine-In':'To-Go';
+  document.getElementById('amtReceived').value='';
+  document.getElementById('refNum').value='';
+  document.getElementById('changeTxt').textContent='';
+  setPayM('cash');
+  document.getElementById('paymentModal').style.display='flex';
+}
+
+function setPayM(m){
+  payMethod=m;
+  document.getElementById('btnCash').classList.toggle('active',m==='cash');
+  document.getElementById('btnGcash').classList.toggle('active',m==='gcash');
+  document.getElementById('cashArea').style.display=m==='cash'?'block':'none';
+  document.getElementById('gcashArea').style.display=m==='gcash'?'block':'none';
+}
+
+function calcChange(){
+  const total=cart.reduce((s,i)=>s+i.subtotal,0);
+  const recv=parseFloat(document.getElementById('amtReceived').value)||0;
+  const ch=recv-total;
+  const el=document.getElementById('changeTxt');
+  el.textContent=recv>0?(ch>=0?`Change: ₱${ch.toFixed(2)}`:'Insufficient amount'):'';
+  el.style.color=ch>=0?'#FFB571':'#EF9A9A';
+}
+
+function confirmPay(){
+  const total=cart.reduce((s,i)=>s+i.subtotal,0);
+  const recv=parseFloat(document.getElementById('amtReceived').value)||0;
+  const ref=document.getElementById('refNum').value;
+  if(payMethod==='cash'&&recv<total){closeM('paymentModal');document.getElementById('errorModal').style.display='flex';return;}
+  const payload={
+    order_type:orderType, payment_method:payMethod,
+    amount_received:payMethod==='cash'?recv:total,
+    reference_number:ref,
+    items:cart.map(i=>({id:i.id,name:i.name,quantity:i.quantity,unit_price:i.unit_price,subtotal:i.subtotal,serving_style:i.serving_style,size:i.size,temperature:i.temperature,addons:i.addons}))
+  };
+  fetch('{% url "cashier:submit_order" %}',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','X-CSRFToken':getCk('csrftoken')},
+    body:JSON.stringify(payload)
+  }).then(r=>r.json()).then(data=>{
+    closeM('paymentModal');
+    if(data.success) {
+      fetchOrderStatuses();
+      showReceipt(data);
+    } else document.getElementById('errorModal').style.display='flex';
+  });
+}
+
+function fetchOrderStatuses() {
+  fetch('{% url "cashier:order_statuses" %}')
+    .then(response => response.json())
+    .then(data => {
+      document.getElementById('statusPendingCount').textContent = data.stats.pending;
+      document.getElementById('statusPreparingCount').textContent = data.stats.preparing;
+      document.getElementById('statusReadyCount').textContent = data.stats.ready;
+      statusNotifications = data.notifications;
+      updateStatusFilters();
+      renderOrderStatusNotifications();
+    });
+}
+
+function renderOrderStatusNotifications() {
+  const list = document.getElementById('orderStatusList');
+  const filtered = statusNotifications.filter(order => order.status === orderStatusFilter);
+  document.getElementById('statusLabel').textContent = `Showing ${orderStatusFilter}`;
+  if (!filtered.length) {
+    list.innerHTML = `<div class="rounded-3xl border border-dashed border-brown-700/50 bg-brown-950/80 p-4 text-center text-sm text-warmgray-400">No ${orderStatusFilter} orders.</div>`;
+    return;
+  }
+  list.innerHTML = filtered.map(order => `
+    <div class="order-status-item rounded-3xl px-4 py-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-warmgray-50">${order.order_number}</p>
+          <p class="mt-1 text-xs text-warmgray-400">${order.order_type} · ${order.created_at}</p>
+        </div>
+        <span class="status-chip ${getStatusChipClass(order.status)}">${order.status.replace(/_/g, ' ')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function setOrderStatusFilter(status) {
+  orderStatusFilter = status;
+  updateStatusFilters();
+  renderOrderStatusNotifications();
+}
+
+function updateStatusFilters() {
+  document.getElementById('filterPending').classList.toggle('active', orderStatusFilter === 'pending');
+  document.getElementById('filterPreparing').classList.toggle('active', orderStatusFilter === 'preparing');
+  document.getElementById('filterReady').classList.toggle('active', orderStatusFilter === 'ready');
+}
+
+function getStatusChipClass(status) {
+  const list = document.getElementById('orderStatusList');
+  if (!notifications.length) {
+    list.innerHTML = '<div class="rounded-3xl border border-dashed border-brown-700/50 bg-brown-950/80 p-4 text-center text-sm text-warmgray-400">No active orders yet.</div>';
+    return;
+  }
+  list.innerHTML = notifications.map(order => `
+    <div class="order-status-item rounded-3xl px-4 py-4">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="truncate text-sm font-semibold text-warmgray-50">${order.order_number}</p>
+          <p class="mt-1 text-xs text-warmgray-400">${order.order_type} · ${order.created_at}</p>
+        </div>
+        <span class="status-chip ${getStatusChipClass(order.status)}">${order.status.replace(/_/g, ' ')}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function getStatusChipClass(status) {
+  if (status === 'pending') return 'status-chip-pending';
+  if (status === 'preparing') return 'status-chip-preparing';
+  if (status === 'ready') return 'status-chip-ready';
+  return 'status-chip-pending';
+}
+
+function showReceipt(data){
+  const chRow=data.payment_method==='cash'?`<div class="rcpt-row flex justify-between py-2 text-sm text-warmgray-300"><span>Change</span><span class="text-orange-400">₱${data.change.toFixed(2)}</span></div>`:'';
+  const rRow=data.reference_number?`<div class="rcpt-row flex justify-between py-2 text-sm text-warmgray-300"><span>Reference Number</span><span>${data.reference_number}</span></div>`:'';
+  document.getElementById('receiptBox').innerHTML=`
+    <div class="rcpt-check text-5xl text-orange-400">✓</div>
+    <div class="rcpt-ok mt-4 text-xl font-semibold text-warmgray-50">Payment Successful</div>
+    <div class="rcpt-meta mt-3 text-sm text-warmgray-300">${data.order_number}<br>${data.created_at}<br>${data.order_type==='dine-in'?'Dine-In':'To-Go'}</div>
+    <div class="rcpt-items mt-6 text-left">${data.items.map(i=>`<div class="rcpt-item flex justify-between border-b border-brown-700 py-2 text-sm text-warmgray-300"><span>${i.quantity}x ${i.name}</span><span>₱${parseFloat(i.subtotal).toFixed(2)}</span></div>`).join('')}</div>
+    <hr class="rcpt-hr my-4 border-brown-700">
+    <div class="rcpt-row flex justify-between py-2 text-sm text-warmgray-300"><strong class="text-warmgray-50">Total</strong><strong class="text-warmgray-50">₱${data.total.toFixed(2)}</strong></div>
+    <div class="rcpt-row flex justify-between py-2 text-sm text-warmgray-300"><span>Payment Method</span><span>${data.payment_method==='cash'?'Cash':'GCash'}</span></div>
+    <div class="rcpt-row flex justify-between py-2 text-sm text-warmgray-300"><span>Amount Received</span><span>₱${parseFloat(data.amount_received).toFixed(2)}</span></div>
+    ${chRow}${rRow}
+    <button class="btn-orange mt-6 w-full rounded-2xl bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="completeNew()">Complete &amp; New Order</button>
+  `;
+  document.getElementById('receiptModal').style.display='flex';
+}
+
+function completeNew(){closeM('receiptModal');cart=[];renderCart();window.location.href='{% url "cashier:welcome" %}';}
+function closeM(id){document.getElementById(id).style.display='none';}
+function getCk(n){const v=document.cookie.match('(^|;) ?'+n+'=([^;]*)(;|$)');return v?v[2]:null;}
+</script>
+
+<!-- Logout Confirmation Modal -->
+<div id="logoutConfirmModal" class="modal-overlay fixed inset-0 z-50 hidden flex items-center justify-center bg-brown-950/80 backdrop-blur-sm">
+  <div class="result-box w-full max-w-sm rounded-[28px] border border-brown-600 bg-brown-900 p-8 text-center shadow-2xl">
+    <div class="err-x text-5xl text-orange-400">⇥</div>
+    <div class="err-title mt-4 text-xl font-semibold text-warmgray-50">Logout in cashier?</div>
+    <div class="err-msg mt-4 text-base font-semibold text-warmgray-50">Are you sure you want to logout from cashier?</div>
+    <div class="modal-actions mt-8 flex flex-wrap justify-center gap-3">
+      <button class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeLogoutConfirm()">NO</button>
+      <button class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="confirmLogout()">Yes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openLogoutConfirm() {
+    const modal = document.getElementById('logoutConfirmModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+  function closeLogoutConfirm() {
+    const modal = document.getElementById('logoutConfirmModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  function confirmLogout() {
+    window.location.href = '{% url "logout" %}';
+  }
+</script>
+{% endblock %}

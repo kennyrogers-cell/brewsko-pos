@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Security - Brewsko Bistro{% endblock %}
+{% block body %}
+<div class="min-h-screen bg-brown-950 text-warmgray-50">
+  <div class="flex min-h-screen">
+    {% with active_nav='security' %}{% include 'panel/sidebar.html' %}{% endwith %}
+    <main class="flex-1 p-8">
+      <div class="space-y-6">
+        <header class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 class="text-4xl font-semibold text-warmgray-50">Security Management</h1>
+            <p class="mt-2 text-warmgray-300">Manage user accounts and view transaction history</p>
+          </div>
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/90 px-5 py-4 text-right">
+            <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Today's Date</p>
+            <p id="liveDate" class="mt-2 text-lg font-semibold text-warmgray-50"></p>
+          </div>
+        </header>
+
+        <div class="flex flex-wrap items-center gap-3 rounded-[26px] border border-brown-700 bg-brown-900/90 px-5 py-4">
+          <a href="?tab=accounts" class="rounded-3xl px-4 py-2 text-sm font-semibold transition {% if active_tab == 'accounts' %}bg-brewsko-500 text-brown-950{% else %}bg-brown-950/80 text-warmgray-300 hover:bg-brown-800{% endif %}">User Accounts</a>
+          <a href="?tab=transactions" class="rounded-3xl px-4 py-2 text-sm font-semibold transition {% if active_tab == 'transactions' %}bg-brewsko-500 text-brown-950{% else %}bg-brown-950/80 text-warmgray-300 hover:bg-brown-800{% endif %}">Transaction History</a>
+        </div>
+
+        {% if active_tab == 'accounts' %}
+        <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <input id="userSearch" type="text" placeholder="Search users..." oninput="filterRows(this, 'user-row')" class="w-full max-w-md rounded-3xl border border-brown-700 bg-brown-950/90 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+          <button type="button" onclick="document.getElementById('addModal').classList.remove('hidden')" class="rounded-3xl bg-brewsko-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brewsko-400">+ Add New User</button>
+        </div>
+
+        <section class="overflow-hidden rounded-[32px] border border-brown-700 bg-brown-900/95 shadow-xl shadow-black/20">
+          <div class="grid grid-cols-[1fr_120px_120px_160px_110px_110px] gap-4 border-b border-brown-700 bg-brown-950/80 px-6 py-4 text-xs uppercase tracking-[0.24em] text-warmgray-300">
+            <span>Username</span>
+            <span>Role</span>
+            <span>Password</span>
+            <span>Last Login</span>
+            <span>Status</span>
+            <span>Actions</span>
+          </div>
+          <div class="divide-y divide-brown-700 max-h-[68vh] overflow-y-auto">
+            {% for u in users %}
+            <div class="user-row grid grid-cols-[1fr_120px_120px_160px_110px_110px] items-center gap-4 px-6 py-4 transition hover:bg-brown-950/80">
+              <span class="font-medium text-warmgray-50">{{ u.username }}</span>
+              <span class="text-warmgray-300 uppercase">{{ u.role }}</span>
+              <span class="text-warmgray-300 tracking-widest">••••••••</span>
+              <span class="text-warmgray-300">{{ u.last_login|date:"Y-m-d h:i A"|default:"Never" }}</span>
+              <span>
+                <span class="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] {% if u.is_active %}bg-brewsko-500/15 text-brewsko-200 ring-1 ring-brewsko-500/20{% else %}bg-red-500/10 text-red-300 ring-1 ring-red-500/20{% endif %}">{% if u.is_active %}Active{% else %}Inactive{% endif %}</span>
+              </span>
+              <span class="flex items-center gap-2">
+                <button type="button" onclick="openEdit({{ u.id }}, '{{ u.username|escapejs }}', '{{ u.role }}')" class="rounded-2xl border border-brown-700 bg-brown-950 px-3 py-2 text-sm text-warmgray-200 transition hover:border-brewsko-500">✏</button>
+                <form method="post" action="{% url 'panel:delete_user' u.id %}" onsubmit="return confirm('Delete {{ u.username }}?')">
+                  {% csrf_token %}
+                  <button type="submit" class="rounded-2xl border border-brown-700 bg-brown-950 px-3 py-2 text-sm text-warmgray-200 transition hover:border-red-500">🗑</button>
+                </form>
+              </span>
+            </div>
+            {% empty %}
+            <div class="px-6 py-12 text-center text-warmgray-300">No users found.</div>
+            {% endfor %}
+          </div>
+        </section>
+        {% else %}
+        <div class="grid gap-5 lg:grid-cols-3">
+          <div class="rounded-[26px] border border-brown-700 bg-brown-900/90 p-6">
+            <p class="text-sm uppercase tracking-[0.35em] text-warmgray-400">Total Transactions</p>
+            <p class="mt-3 text-3xl font-semibold text-warmgray-50">₱ {{ total_transactions|floatformat:0 }}</p>
+          </div>
+          <div class="rounded-[26px] border border-brown-700 bg-brown-900/90 p-6">
+            <p class="text-sm uppercase tracking-[0.35em] text-warmgray-400">Cash Payments</p>
+            <p class="mt-3 text-3xl font-semibold text-warmgray-50">₱ {{ cash_payments|floatformat:0 }}</p>
+          </div>
+          <div class="rounded-[26px] border border-brown-700 bg-brown-900/90 p-6">
+            <p class="text-sm uppercase tracking-[0.35em] text-warmgray-400">GCash Payments</p>
+            <p class="mt-3 text-3xl font-semibold text-warmgray-50">₱ {{ gcash_payments|floatformat:0 }}</p>
+          </div>
+        </div>
+
+        <div class="mt-6">
+          <input id="txSearch" type="text" placeholder="Search transactions..." oninput="filterRows(this, 'tx-row')" class="w-full max-w-xl rounded-3xl border border-brown-700 bg-brown-950/90 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+        </div>
+
+        <section class="overflow-hidden rounded-[32px] border border-brown-700 bg-brown-900/95 shadow-xl shadow-black/20">
+          <div class="grid grid-cols-[110px_130px_100px_130px_70px_90px_160px] gap-4 border-b border-brown-700 bg-brown-950/80 px-6 py-4 text-xs uppercase tracking-[0.24em] text-warmgray-300">
+            <span>Order #</span>
+            <span>Cashier</span>
+            <span>Amount</span>
+            <span>Payment</span>
+            <span>Items</span>
+            <span>Type</span>
+            <span>Timestamp</span>
+          </div>
+          <div class="divide-y divide-brown-700 max-h-[68vh] overflow-y-auto">
+            {% for tx in transactions %}
+            <div class="tx-row grid grid-cols-[110px_130px_100px_130px_70px_90px_160px] items-center gap-4 px-6 py-4 transition hover:bg-brown-950/80">
+              <span class="text-warmgray-50">{{ tx.order_number }}</span>
+              <span class="text-warmgray-300">{{ tx.cashier.username|default:"-" }}</span>
+              <span class="text-warmgray-300">₱ {{ tx.total }}</span>
+              <span>
+                <span class="inline-flex rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] {% if tx.payment_method == 'cash' %}bg-brewsko-500/15 text-brewsko-200 ring-1 ring-brewsko-500/20{% else %}bg-orange-500/10 text-orange-300 ring-1 ring-orange-500/20{% endif %}">{{ tx.payment_method|upper|default:"-" }}</span>
+              </span>
+              <span class="text-warmgray-300">{{ tx.items.count }}</span>
+              <span>
+                <span class="inline-flex rounded-full bg-orange-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-orange-300 ring-1 ring-orange-500/20">{{ tx.get_order_type_display }}</span>
+              </span>
+              <span class="text-warmgray-300 text-[11px]">{{ tx.created_at|date:"Y-m-d h:i A" }}</span>
+            </div>
+            {% empty %}
+            <div class="px-6 py-12 text-center text-warmgray-300">No transactions yet.</div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+      </div>
+    </main>
+  </div>
+</div>
+
+<div id="addModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-brown-950/80 backdrop-blur-sm p-4">
+  <div class="w-full max-w-xl rounded-[32px] border border-brown-700 bg-brown-900/95 p-8 shadow-2xl shadow-black/40">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-2xl font-semibold text-warmgray-50">Add New User</h2>
+      <button type="button" onclick="document.getElementById('addModal').classList.add('hidden')" class="text-warmgray-300 transition hover:text-warmgray-100">✕</button>
+    </div>
+    <form method="post" action="{% url 'panel:add_user' %}" class="mt-6 space-y-5">
+      {% csrf_token %}
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="block space-y-2 text-sm text-warmgray-300">
+          <span>Username</span>
+          <input type="text" name="username" required class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+        </label>
+        <label class="block space-y-2 text-sm text-warmgray-300">
+          <span>Password</span>
+          <input type="password" name="password" required class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+        </label>
+      </div>
+      <label class="block space-y-2 text-sm text-warmgray-300">
+        <span>Role</span>
+        <select name="role" class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500">
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="kitchen">Kitchen</option>
+        </select>
+      </label>
+      <div class="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        <button type="button" onclick="document.getElementById('addModal').classList.add('hidden')" class="rounded-3xl border border-brown-700 bg-brown-950 px-5 py-3 text-sm text-warmgray-200 transition hover:bg-brown-900">Cancel</button>
+        <button type="submit" class="rounded-3xl bg-brewsko-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brewsko-400">Save User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="editModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-brown-950/80 backdrop-blur-sm p-4">
+  <div class="w-full max-w-xl rounded-[32px] border border-brown-700 bg-brown-900/95 p-8 shadow-2xl shadow-black/40">
+    <div class="flex items-center justify-between gap-4">
+      <h2 class="text-2xl font-semibold text-warmgray-50">Edit User</h2>
+      <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="text-warmgray-300 transition hover:text-warmgray-100">✕</button>
+    </div>
+    <form id="editForm" method="post" class="mt-6 space-y-5">
+      {% csrf_token %}
+      <div class="grid gap-4 md:grid-cols-2">
+        <label class="block space-y-2 text-sm text-warmgray-300">
+          <span>Username</span>
+          <input id="eUname" type="text" name="username" required class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+        </label>
+        <label class="block space-y-2 text-sm text-warmgray-300">
+          <span>Password</span>
+          <input id="ePw" type="password" name="password" placeholder="Leave blank to keep current" class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500" />
+        </label>
+      </div>
+      <label class="block space-y-2 text-sm text-warmgray-300">
+        <span>Role</span>
+        <select id="eRole" name="role" class="w-full rounded-3xl border border-brown-700 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none focus:border-brewsko-500">
+          <option value="admin">Admin</option>
+          <option value="cashier">Cashier</option>
+          <option value="kitchen">Kitchen</option>
+        </select>
+      </label>
+      <div class="flex flex-col items-end gap-3 sm:flex-row sm:justify-end">
+        <button type="button" onclick="document.getElementById('editModal').classList.add('hidden')" class="rounded-3xl border border-brown-700 bg-brown-950 px-5 py-3 text-sm text-warmgray-200 transition hover:bg-brown-900">Cancel</button>
+        <button type="submit" class="rounded-3xl bg-brewsko-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-brewsko-400">Save User</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('liveDate').textContent = new Date().toLocaleDateString('en-US',{month:'long',day:'numeric',year:'numeric'});
+function openEdit(id, username, role) {
+  document.getElementById('eUname').value = username;
+  document.getElementById('eRole').value = role;
+  document.getElementById('ePw').value = '';
+  document.getElementById('editForm').action = `/panel/security/user/${id}/edit/`;
+  document.getElementById('editModal').classList.remove('hidden');
+}
+</script>
+{% endblock %}

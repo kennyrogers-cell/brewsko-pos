@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}Brewsko Bistro POS{% endblock %}</title>
+{% load static %}
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          brewsko: {
+            50: '#FFF8F1',
+            100: '#FCE8D1',
+            200: '#F6CAA8',
+            300: '#EDA579',
+            400: '#E87A46',
+            500: '#DC5F2D',
+            600: '#B94B24',
+            700: '#893C1D',
+            800: '#6B3018',
+            900: '#4E2413'
+          },
+          warmgray: {
+            50: '#F5E6D0',
+            100: '#E8D4B8',
+            200: '#D4C2A0',
+            300: '#C8A882',
+            400: '#B89670',
+            500: '#A38456',
+            600: '#8A6040',
+            700: '#7A4020',
+            800: '#5A2E0E',
+            900: '#4A2010',
+            950: '#3D1A08'
+          },
+          brown: {
+            950: '#2C1203',
+            900: '#3D1A08',
+            800: '#4A2010',
+            700: '#5A2E0E',
+            600: '#7A4020',
+            500: '#8A6040',
+            400: '#A38456',
+            300: '#B89670',
+            200: '#D4C2A0',
+            100: '#E8D4B8',
+            50: '#F5E6D0'
+          }
+        }
+      }
+    }
+  }
+</script>
+<link rel="stylesheet" href="{% static 'css/styles.css' %}">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Raleway:wght@300;400;500;600&display=swap" rel="stylesheet">
+{% block extra_head %}{% endblock %}
+</head>
+<body class="min-h-screen bg-brown-950 text-warmgray-50 font-['Raleway',sans-serif]">
+<!-- Toast Container for Login Notifications Only -->
+<div id="toastContainer" class="fixed inset-0 z-50 flex items-center justify-center pointer-events-none px-4 py-4">
+  {% if messages and request.resolver_match.url_name == 'login' %}
+    <div class="space-y-3 w-full max-w-md">
+      {% for message in messages %}
+        <div class="toast-message rounded-3xl border px-4 py-3 text-sm shadow-xl shadow-black/20 pointer-events-auto transition-all duration-500 ease-out {% if message.tags == 'error' %}border-red-500/40 bg-red-500/10 text-red-100{% else %}border-brewsko-500/40 bg-brewsko-500/10 text-warmgray-50{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+
+<!-- Modal Notification Container for Non-Login Pages -->
+{% if messages and request.resolver_match.url_name != 'login' %}
+  {% for message in messages %}
+    <div id="notificationModal" class="fixed inset-0 z-50 flex items-center justify-center bg-brown-950/80 backdrop-blur-sm px-4">
+      <div class="w-full max-w-md rounded-[32px] border border-brown-700 bg-brown-900/95 p-8 shadow-2xl shadow-black/40">
+        <div class="mb-6 text-center">
+          <div class="mb-4 text-5xl">
+            {% if message.tags == 'error' %}
+              ✕
+            {% else %}
+              ✓
+            {% endif %}
+          </div>
+          <h2 class="text-2xl font-semibold text-warmgray-50">
+            {% if message.tags == 'error' %}
+              Error
+            {% else %}
+              Success
+            {% endif %}
+          </h2>
+          <p class="mt-4 text-warmgray-300">{{ message }}</p>
+        </div>
+        <div class="mt-8 flex flex-col gap-3 sm:flex-row sm:justify-center">
+          <button onclick="closeNotificationModal()" class="rounded-2xl border border-brown-600 bg-brown-800 px-6 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-warmgray-400 hover:bg-brown-700">
+            {% if message.tags == 'error' %}
+              Try Again
+            {% else %}
+              Continue
+            {% endif %}
+          </button>
+        </div>
+      </div>
+    </div>
+    <script>
+      function closeNotificationModal() {
+        const modal = document.getElementById('notificationModal');
+        if (modal) {
+          modal.style.opacity = '0';
+          modal.style.pointerEvents = 'none';
+          setTimeout(() => modal.remove(), 300);
+        }
+      }
+      // Auto-close after 5 seconds if not dismissed
+      setTimeout(closeNotificationModal, 5000);
+    </script>
+  {% endfor %}
+{% endif %}
+{% block body %}{% endblock %}
+<script src="{% static 'js/main.js' %}"></script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

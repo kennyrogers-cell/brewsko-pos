@@ -1,0 +1,106 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Dashboard - Brewsko Bistro Admin{% endblock %}
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+{% block body %}
+<div class="min-h-screen bg-brown-950 text-warmgray-50">
+  <div class="flex min-h-screen">
+    {% with active_nav='dashboard' %}{% include 'panel/sidebar.html' %}{% endwith %}
+    <main class="flex-1 p-8">
+      <div class="flex flex-col gap-6">
+        <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 class="text-4xl font-semibold text-warmgray-50">Dashboard</h1>
+            <p class="mt-2 text-warmgray-400">Welcome back, Admin</p>
+          </div>
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/90 px-5 py-4 text-right">
+            <p class="text-xs uppercase tracking-[0.4em] text-warmgray-400">Today's Date</p>
+            <p class="mt-2 text-lg font-semibold text-warmgray-50">{{ today|date:"F d, Y" }}</p>
+          </div>
+        </div>
+
+        <div class="grid gap-5 xl:grid-cols-4 lg:grid-cols-2">
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <div class="text-sm text-warmgray-400">Total Sales Today</div>
+            <div class="mt-3 text-3xl font-semibold text-brewsko-300">₱ {{ total_sales|floatformat:0 }}</div>
+          </div>
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <div class="text-sm text-warmgray-400">Orders Today</div>
+            <div class="mt-3 text-3xl font-semibold text-warmgray-50">{{ order_count }}</div>
+          </div>
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <div class="text-sm text-warmgray-400">Average Order Value</div>
+            <div class="mt-3 text-3xl font-semibold text-warmgray-50">₱ {{ avg_order|floatformat:0 }}</div>
+          </div>
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <div class="text-sm text-warmgray-400">Low Stock Items</div>
+            <div class="mt-3 text-3xl font-semibold text-warmgray-50">{{ low_stock_count }}</div>
+          </div>
+        </div>
+
+        <div class="grid gap-5 xl:grid-cols-2">
+          <section class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <h2 class="text-xl font-semibold text-warmgray-50">Weekly Sales</h2>
+            <div class="mt-5 h-72">
+              <canvas id="weeklySalesChart"></canvas>
+            </div>
+          </section>
+          <section class="rounded-3xl border border-brown-700 bg-brown-900/95 p-6">
+            <h2 class="text-xl font-semibold text-warmgray-50">Today's Order Trend</h2>
+            <div class="mt-5 h-72">
+              <canvas id="orderTrendChart"></canvas>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const weeklyData = {{ weekly_data|safe }};
+const hourlyData = {{ hourly_data|safe }};
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#B88671' }, grid: { color: 'rgba(220,95,45,0.16)' } },
+    y: { ticks: { color: '#B88671' }, grid: { color: 'rgba(220,95,45,0.16)' } }
+  }
+};
+
+new Chart(document.getElementById('weeklySalesChart'), {
+  type: 'bar',
+  data: {
+    labels: weeklyData.map(d => d.date),
+    datasets: [{
+      data: weeklyData.map(d => d.total),
+      backgroundColor: 'rgba(220,95,45,0.8)',
+      borderColor: '#DC5F2D',
+      borderWidth: 1,
+      borderRadius: 8,
+    }]
+  },
+  options: chartDefaults
+});
+
+new Chart(document.getElementById('orderTrendChart'), {
+  type: 'line',
+  data: {
+    labels: hourlyData.map(d => d.hour),
+    datasets: [{
+      data: hourlyData.map(d => d.count),
+      borderColor: '#DC5F2D',
+      backgroundColor: 'rgba(220,95,45,0.18)',
+      tension: 0.35,
+      fill: true,
+      pointBackgroundColor: '#DC5F2D',
+    }]
+  },
+  options: chartDefaults
+});
+</script>
+{% endblock %}

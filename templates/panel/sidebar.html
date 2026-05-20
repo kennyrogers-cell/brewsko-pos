@@ -1,0 +1,54 @@
+{% load static %}
+<aside class="flex h-full w-72 flex-col bg-brown-900 border-r border-brown-700 px-6 py-8">
+  <div class="mb-10 flex flex-col items-center gap-3 text-center">
+    <img src="{% static 'img/logo.png' %}" alt="Brewsko" class="h-20 w-20 rounded-3xl border border-brown-600 bg-brown-800 object-cover" onerror="this.style.display='none'">
+    <p class="text-sm uppercase tracking-[0.3em] text-warmgray-400">Admin Panel</p>
+  </div>
+
+  <nav class="space-y-2 text-sm font-medium text-warmgray-200">
+    <a href="{% url 'panel:dashboard' %}" class="flex items-center gap-3 rounded-3xl px-4 py-3 transition hover:bg-brown-800 {% if active_nav == 'dashboard' %}bg-brewsko-500 text-brown-950{% endif %}">
+      <span>⊞</span> Dashboard
+    </a>
+    <a href="{% url 'panel:menu' %}" class="flex items-center gap-3 rounded-3xl px-4 py-3 transition hover:bg-brown-800 {% if active_nav == 'menu' %}bg-brewsko-500 text-brown-950{% endif %}">
+      <span>≡</span> Manage Menu
+    </a>
+    <a href="{% url 'panel:inventory' %}" class="flex items-center gap-3 rounded-3xl px-4 py-3 transition hover:bg-brown-800 {% if active_nav == 'inventory' %}bg-brewsko-500 text-brown-950{% endif %}">
+      <span>⊙</span> Inventory
+    </a>
+    <a href="{% url 'panel:security' %}" class="flex items-center gap-3 rounded-3xl px-4 py-3 transition hover:bg-brown-800 {% if active_nav == 'security' %}bg-brewsko-500 text-brown-950{% endif %}">
+      <span>⊕</span> Security
+    </a>
+  </nav>
+
+  <div class="mt-auto pt-8">
+    <button type="button" onclick="openAdminLogoutConfirm()" class="inline-flex w-full items-center justify-center gap-2 rounded-3xl border border-orange-500 bg-orange-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-orange-400">
+      <span>⇥</span> Logout
+    </button>
+  </div>
+
+  <div id="adminLogoutModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-brown-950/80 backdrop-blur-sm px-4">
+    <div class="result-box w-full max-w-sm rounded-[28px] border border-brown-600 bg-brown-900 p-8 text-center shadow-2xl">
+      <div class="err-x text-5xl text-orange-400">⇥</div>
+      <div class="err-title mt-4 text-xl font-semibold text-warmgray-50">Logout in admin?</div>
+      <div class="err-msg mt-4 text-base font-semibold text-warmgray-50">Are you sure you want to logout from admin?</div>
+      <div class="modal-actions mt-8 flex flex-wrap justify-center gap-3">
+        <button type="button" class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeAdminLogoutConfirm()">NO</button>
+        <button type="button" class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="confirmAdminLogout()">Yes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function openAdminLogoutConfirm() {
+      const modal = document.getElementById('adminLogoutModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+    function closeAdminLogoutConfirm() {
+      const modal = document.getElementById('adminLogoutModal');
+      if (modal) modal.classList.add('hidden');
+    }
+    function confirmAdminLogout() {
+      window.location.href = '{% url "logout" %}';
+    }
+  </script>
+</aside>

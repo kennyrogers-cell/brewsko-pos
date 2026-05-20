@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Kitchen Dashboard - Brewsko Bistro{% endblock %}
+{% block body %}
+<style>
+/* Prevent whole page scrolling — contain kitchen view to viewport */
+#kitchenRoot { height: 100vh; overflow: hidden; }
+/* Kitchen order visuals */
+.kitchen-orders-area { max-height: calc(100vh - 14rem); overflow-y: auto; padding-right: 0.5rem; }
+.order-card { transition: box-shadow 0.2s, transform 0.15s; position: relative; }
+.order-card.order-selectable { cursor: pointer; }
+.order-card.order-selectable:hover { box-shadow: 0 0 0 1px rgba(255,140,0,0.2), 0 12px 24px -14px rgba(255,140,0,0.18); }
+.order-card.order-selected { border-color: #ff9b4c; background-color: rgba(255,155,76,0.08); }
+.order-card.order-checked { border-color: #27ae60; background-color: rgba(39,174,96,0.08); }
+.order-card .order-check { position: absolute; top: 1rem; left: 1rem; height: 2rem; width: 2rem; border-radius: 9999px; display: grid; place-items: center; background: #27ae60; color: #021b10; font-weight: 700; box-shadow: 0 0 0 4px rgba(39,174,96,0.16); }
+.order-blink { animation: kitchen-blink 0.8s ease-in-out infinite; border-color: #df5c1f; }
+@keyframes kitchen-blink {
+  0% { box-shadow: 0 0 0 0 rgba(223,92,31,0); transform: translateY(0); background-color: transparent; }
+  50% { box-shadow: 0 0 0 18px rgba(223,92,31,0.18); transform: translateY(-3px); background-color: rgba(223,92,31,0.02); }
+  100% { box-shadow: 0 0 0 0 rgba(223,92,31,0); transform: translateY(0); background-color: transparent; }
+}
+.ready-order { border-color: #27ae60; background: linear-gradient(180deg, rgba(39,174,96,0.06), rgba(39,174,96,0.02)); }
+.start-prepare-btn { background-color: #df5c1f; border-color:#df5c1f; }
+.complete-btn { background-color: #27ae60; border-color: #27ae60; color: #021b10; }
+.complete-btn:hover { background-color: #22a055; }
+</style>
+<div id="kitchenRoot" class="min-h-screen bg-brown-950 px-4 py-8">
+  <div class="mx-auto max-w-6xl space-y-8">
+    <header class="rounded-[32px] border border-brown-700 bg-brown-900/95 p-6 shadow-2xl shadow-black/20 sm:flex sm:items-center sm:justify-between">
+      <div class="flex items-center gap-4">
+        <img src="{% static 'img/logo.png' %}" alt="Brewsko" class="h-16 w-16 rounded-3xl border border-brown-600 bg-brown-800 object-cover" onerror="this.style.display='none'">
+        <div>
+          <h1 class="text-3xl font-semibold text-warmgray-50">Kitchen Dashboard</h1>
+          <p class="mt-1 text-warmgray-300">Grill &amp; Coffee Station</p>
+        </div>
+      </div>
+      <div class="mt-6 flex flex-col gap-3 sm:mt-0 sm:text-right">
+        <div class="rounded-3xl bg-brown-950/90 px-4 py-3 text-warmgray-100">
+          <div class="text-sm uppercase tracking-[0.35em] text-warmgray-400">Clock</div>
+          <div class="mt-1 text-lg font-semibold text-warmgray-50" id="clockTime">--:--:-- --</div>
+          <div class="text-sm text-warmgray-300" id="clockDate">--</div>
+        </div>
+        <button type="button" onclick="openKitchenLogoutConfirm()" class="inline-flex items-center justify-center rounded-3xl border border-orange-500 bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-400">⇥ Logout</button>
+      </div>
+    </header>
+
+    <div class="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
+      <aside class="space-y-6 rounded-[32px] border border-brown-700 bg-brown-900/95 p-6">
+        <label class="block text-sm text-warmgray-200">
+          <span class="mb-3 block text-xs uppercase tracking-[0.35em] text-warmgray-400">Search orders</span>
+          <input id="kitchenSearch" type="text" placeholder="Search menu items..." class="w-full rounded-3xl border border-brown-600 bg-brown-950 px-4 py-3 text-warmgray-50 outline-none transition focus:border-brewsko-500" />
+        </label>
+
+        <div class="space-y-3">
+          <div class="rounded-3xl bg-brown-950/80 p-4">
+            <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Pending</p>
+            <p class="mt-2 text-3xl font-semibold text-brewsko-300" id="statPending">0</p>
+          </div>
+          <div class="rounded-3xl bg-brown-950/80 p-4">
+            <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Preparing</p>
+            <p class="mt-2 text-3xl font-semibold text-warmgray-50" id="statPreparing">0</p>
+          </div>
+          <div class="rounded-3xl bg-brown-950/80 p-4">
+            <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Ready</p>
+            <p class="mt-2 text-3xl font-semibold text-brewsko-300" id="statReady">0</p>
+          </div>
+          <div class="rounded-3xl bg-brown-950/80 p-4">
+            <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Total Orders</p>
+            <p class="mt-2 text-3xl font-semibold text-warmgray-50" id="statTotal">0</p>
+          </div>
+        </div>
+      </aside>
+
+      <section id="kitchenOrders" class="kitchen-orders-area space-y-4 rounded-[32px] border border-brown-700 bg-brown-900/95 p-6 min-h-[420px]">
+        <div class="rounded-3xl border border-dashed border-brown-600/60 bg-brown-950/70 p-8 text-center text-warmgray-300">
+          <h2 class="text-2xl font-semibold text-warmgray-50">No Orders</h2>
+          <p class="mt-2 text-sm text-warmgray-300">Waiting for new orders...</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockTime').textContent = now.toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  document.getElementById('clockDate').textContent = now.toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'});
+}
+
+let selectedKitchenOrder = null;
+let currentOrders = [];
+
+function renderOrders(orders) {
+  const container = document.getElementById('kitchenOrders');
+  const query = document.getElementById('kitchenSearch').value.toLowerCase();
+  const filtered = orders.filter(order =>
+    !query || order.order_number.toLowerCase().includes(query) || order.items.some(item => item.name.toLowerCase().includes(query))
+  );
+
+  if (selectedKitchenOrder) {
+    const selectedOrder = orders.find(order => order.id === selectedKitchenOrder);
+    if (!selectedOrder || selectedOrder.status !== 'preparing') selectedKitchenOrder = null;
+  }
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="rounded-3xl border border-dashed border-brown-600/60 bg-brown-950/70 p-8 text-center text-warmgray-300"><h2 class="text-2xl font-semibold text-warmgray-50">No Orders</h2><p class="mt-2 text-sm text-warmgray-300">Waiting for new orders...</p></div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(order => `
+    <article class="order-card rounded-3xl border border-brown-700 bg-brown-950/80 p-5 shadow-xl shadow-black/10 ${order.status === 'preparing' ? 'order-blink order-selectable' : ''} ${order.status === 'ready' ? 'order-checked' : ''} ${selectedKitchenOrder === order.id ? 'order-selected' : ''}" ${order.status === 'preparing' ? `onclick="toggleKitchenOrder(${order.id})"` : ''}>
+      ${order.status === 'ready' ? '<div class="order-check">✓</div>' : ''}
+      <div class="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.35em] text-warmgray-400">Order ${order.order_number}</p>
+          <p class="mt-2 text-base font-semibold text-warmgray-50">${order.order_type}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="rounded-2xl bg-brown-900 px-4 py-2 text-sm text-warmgray-100">${order.created_at}</span>
+          <button type="button" onclick="event.stopPropagation(); updateOrder(${order.id})" class="${order.status === 'pending' ? 'rounded-2xl start-prepare-btn px-4 py-2 text-sm font-semibold text-white transition' : order.status === 'preparing' ? 'rounded-2xl bg-orange-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-orange-400' : 'rounded-2xl complete-btn px-4 py-2 text-sm font-semibold text-white transition'}">${order.status === 'pending' ? 'Start Preparing' : order.status === 'preparing' ? 'Mark as Ready' : 'Complete Order'}</button>
+        </div>
+      </div>
+      <div class="mt-5 space-y-3">
+        ${order.items.map(item => `
+          <div class="rounded-3xl border border-brown-700 bg-brown-900/90 p-4">
+            <div class="flex items-center justify-between gap-4">
+              <p class="text-sm font-semibold text-warmgray-50">${item.name}</p>
+              <span class="text-sm text-warmgray-300">Qty ${item.quantity}</span>
+            </div>
+            <p class="mt-2 text-sm text-warmgray-300">${item.customizations || 'No customizations'}</p>
+          </div>
+        `).join('')}
+      </div>
+    </article>
+  `).join('');
+}
+
+function fetchOrders() {
+  fetch('{% url "kitchen:get_orders" %}')
+    .then(response => response.json())
+    .then(data => {
+      currentOrders = data.orders;
+      document.getElementById('statPending').textContent = data.stats.pending;
+      document.getElementById('statPreparing').textContent = data.stats.preparing;
+      document.getElementById('statReady').textContent = data.stats.ready;
+      document.getElementById('statTotal').textContent = data.stats.total;
+      renderOrders(currentOrders);
+    });
+}
+
+function toggleKitchenOrder(id) {
+  selectedKitchenOrder = selectedKitchenOrder === id ? null : id;
+  renderOrders(currentOrders || []);
+}
+
+function updateOrder(id) {
+  fetch(`/kitchen/orders/${id}/update/`, {
+    method: 'POST',
+    headers: { 'X-CSRFToken': getCookie('csrftoken') },
+  })
+    .then(() => {
+      selectedKitchenOrder = null;
+      fetchOrders();
+    });
+}
+
+function getCookie(name) {
+  const value = document.cookie.match('(^|;)\s*' + name + '\s*=\s*([^;]+)');
+  return value ? value.pop() : '';
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  updateClock();
+  setInterval(updateClock, 1000);
+  fetchOrders();
+  setInterval(fetchOrders, 5000);
+  document.getElementById('kitchenSearch').addEventListener('input', fetchOrders);
+});
+</script>
+
+<div id="kitchenLogoutModal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-brown-950/80 backdrop-blur-sm px-4">
+  <div class="result-box w-full max-w-sm rounded-[28px] border border-brown-600 bg-brown-900 p-8 text-center shadow-2xl">
+    <div class="err-x text-5xl text-orange-400">⇥</div>
+    <div class="err-title mt-4 text-xl font-semibold text-warmgray-50">Logout in kitchen?</div>
+    <div class="err-msg mt-4 text-base font-semibold text-warmgray-50">Are you sure you want to logout from kitchen?</div>
+    <div class="modal-actions mt-8 flex flex-wrap justify-center gap-3">
+      <button type="button" class="btn-cancel rounded-2xl border border-brown-600 bg-brown-800 px-5 py-3 text-sm font-semibold text-warmgray-50 transition hover:border-orange-500" onclick="closeKitchenLogoutConfirm()">NO</button>
+      <button type="button" class="btn-orange rounded-2xl bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-600" onclick="confirmKitchenLogout()">Yes</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function openKitchenLogoutConfirm() {
+    const modal = document.getElementById('kitchenLogoutModal');
+    if (modal) modal.classList.remove('hidden');
+  }
+  function closeKitchenLogoutConfirm() {
+    const modal = document.getElementById('kitchenLogoutModal');
+    if (modal) modal.classList.add('hidden');
+  }
+  function confirmKitchenLogout() {
+    window.location.href = '{% url "logout" %}';
+  }
+</script>
+{% endblock %}
